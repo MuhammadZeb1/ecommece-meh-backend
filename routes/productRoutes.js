@@ -16,7 +16,7 @@ router.get("/", getAllProducts);
 router.get("/:id", getProductById);
 
 // Protected routes
-router.post("/create",  upload.single("image"), createProduct);
+router.post("/create", protect, upload.single("image"), createProduct);
 router.put("/update/:id", protect, upload.single("image"), updateProduct);
 router.delete("/delete/:id", protect, deleteProduct);
 

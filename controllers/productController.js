@@ -20,7 +20,8 @@ const uploadToCloudinary = (buffer, folder = "products") => {
 export const createProduct = async (req, res) => {
   try {
     const { name, description, price, categoryName, subCategory } = req.body;
-    if (!req.file) return res.status(400).json({ message: "Image is required" });
+    if (!req.file)
+      return res.status(400).json({ message: "Image is required" });
 
     const result = await uploadToCloudinary(req.file.buffer);
 
@@ -91,10 +92,10 @@ export const updateProduct = async (req, res) => {
 // ------------------- DELETE -------------------
 export const deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const { id } = req.params;
+    const product = await Product.findByIdAndDelete(id);
     if (!product) return res.status(404).json({ message: "Product not found" });
-
-    await product.remove();
+    // await product.remove();
     res.status(200).json({ message: "Product deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
