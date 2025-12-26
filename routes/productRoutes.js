@@ -1,10 +1,10 @@
 import express from "express";
 import {
-  createProduct,
   getAllProducts,
   getProductById,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  createOrUploadProducts
 } from "../controllers/productController.js";
 import upload from "../middlewares/upload.js"
 import protect from "../middlewares/authMiddlewares.js";
@@ -16,7 +16,7 @@ router.get("/", getAllProducts);
 router.get("/:id", getProductById);
 
 // Protected routes
-router.post("/create", protect, upload.single("image"), createProduct);
+router.post("/create", protect, upload.single("file"), createOrUploadProducts);
 router.put("/update/:id", protect, upload.single("image"), updateProduct);
 router.delete("/delete/:id", protect, deleteProduct);
 

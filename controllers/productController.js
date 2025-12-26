@@ -1,40 +1,72 @@
+// controllers/productController.js
 import Product from "../models/Product.js";
-import cloudinary from "../config/cloudinary.js";
-import streamifier from "streamifier";
+import { parseCSV, parseExcel, uploadToCloudinary } from "../utils/fileHelpers.js";
 
-// Helper to upload image buffer to Cloudinary
-const uploadToCloudinary = (buffer, folder = "products") => {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder },
-      (error, result) => {
-        if (result) resolve(result);
-        else reject(error);
-      }
-    );
-    streamifier.createReadStream(buffer).pipe(stream);
-  });
-};
-
-// ------------------- CREATE -------------------
-export const createProduct = async (req, res) => {
+export const createOrUploadProducts = async (req, res) => {
+  console.log("first")
   try {
-    const { name, description, price, categoryName, subCategory } = req.body;
-    if (!req.file)
-      return res.status(400).json({ message: "Image is required" });
+    if (!req.file) return res.status(400).json({ message: "File or image is required" });
 
+    const fileType = req.file.originalname.split(".").pop().toLowerCase();
+    console.log("2")
+
+    // ----- BULK UPLOAD -----
+    if (["csv", "xlsx", "xls"].includes(fileType)) {
+      let productsData = [];
+
+      if (fileType === "csv") {
+        productsData = await parseCSV(req.file.buffer);
+      } else {
+        productsData = parseExcel(req.file.buffer);
+      }
+
+      // Check if productsData is empty or undefined
+      if (!productsData || productsData.length === 0) {
+        console.log("No valid data found in the file.");
+        return res.status(400).json({ message: "No valid data found in the file." });
+
+      }
+
+      console.log("Parsed Data Sample:", productsData[0]);
+
+      // Format data and filter out rows missing the 'name' field
+      const formattedData = productsData
+        .filter((p) => p.name) // Skip rows where name is missing
+        .map((p) => ({
+          name: p.name.trim(),
+          description: p.description || "",
+          price: Number(p.price) || 0,
+          image: p.image || "", 
+          category: { 
+            name: p.categoryName || "Uncategorized", 
+            subCategory: p.subCategory || "" 
+          },
+        }));
+
+      if (formattedData.length === 0) {
+        return res.status(400).json({ message: "No valid product names found in file." });
+      }
+
+      const createdProducts = await Product.insertMany(formattedData);
+      return res.status(201).json({ message: "Bulk products uploaded", createdProducts });
+    }
+
+    // ----- SINGLE IMAGE UPLOAD -----
+    const { name, description, price, categoryName, subCategory } = req.body;
     const result = await uploadToCloudinary(req.file.buffer);
 
     const product = await Product.create({
       name,
       description,
-      price,
+      price: Number(price) || 0,
       image: result.secure_url,
       category: { name: categoryName, subCategory },
     });
 
     res.status(201).json({ message: "Product created", product });
+
   } catch (err) {
+    console.error("Controller Error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -95,7 +127,6 @@ export const deleteProduct = async (req, res) => {
     const { id } = req.params;
     const product = await Product.findByIdAndDelete(id);
     if (!product) return res.status(404).json({ message: "Product not found" });
-    // await product.remove();
     res.status(200).json({ message: "Product deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
