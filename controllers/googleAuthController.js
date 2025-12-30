@@ -25,9 +25,10 @@ export const googleLogin = async (req, res) => {
         name,
         email,
         password: null,
+        
       });
     }
-
+      console.log("role:",user.role)
     // Send back app JWT
     res.json({
       message: "Google login successful",
@@ -36,6 +37,7 @@ export const googleLogin = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
       },
     });
   } catch (err) {
