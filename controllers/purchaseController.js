@@ -1,5 +1,5 @@
-import AdminPurchase from "../models/AdminPurchase.js";
-import CustomerPurchase from "../models/CustomerPurchase.js";
+import AdminPurchase from "../models/AdminPurchaseSchema.js";
+import CustomerPurchase from "../models/CustomerPurchaseSchema.js";
 import Product from "../models/Product.js";
 
 // Create a purchase (Customer buys a product)

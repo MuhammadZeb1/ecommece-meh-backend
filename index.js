@@ -5,6 +5,7 @@ import express from 'express'
 import connectDB from './config/db.js'
 import authRoutes from './routes/authRoutes.js'
 import productRoutes from './routes/productRoutes.js'
+import purchaseRoutes from "./routes/purchaseRoutes.js";
 import cors from 'cors'
 
 
@@ -27,6 +28,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/purchases", purchaseRoutes);
 
 
 app.get('/', (req, res) => {
