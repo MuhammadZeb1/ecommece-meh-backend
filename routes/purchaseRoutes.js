@@ -5,6 +5,7 @@ import {
   getCustomerPurchases,
   deletePurchaseByAdmin,
   deletePurchaseByCustomer,
+  getAdminAnalytics // ✅ Import the new analytics controller
 } from "../controllers/purchaseController.js";
 import authMiddleware from "../middlewares/authMiddlewares.js";
 
@@ -21,6 +22,11 @@ router.get("/customer", authMiddleware, getCustomerPurchases);
 router.delete("/customer/:purchaseId", authMiddleware, deletePurchaseByCustomer);
 
 // =================== Admin Routes ===================
+
+// ✅ Admin sees sales analytics (Daily, Weekly, Monthly)
+// Access via: GET /api/purchases/admin/analytics?period=weekly
+router.get("/admin/analytics", authMiddleware, getAdminAnalytics);
+
 // Admin sees all purchases
 router.get("/admin", authMiddleware, getAllAdminPurchases);
 
