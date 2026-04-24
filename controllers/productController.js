@@ -34,6 +34,7 @@ export const createOrUploadProducts = async (req, res) => {
         .map((p) => ({
           name: p.name.trim(),
           description: p.description || "",
+          basePrice: p.basePrice ? String(p.basePrice) : "",
           price: p.price !== undefined ? Number(p.price) : 0,
           quantity: p.quantity !== undefined ? Number(p.quantity) : 0,
           image: p.image || "https://via.placeholder.com/150",
@@ -59,7 +60,7 @@ export const createOrUploadProducts = async (req, res) => {
     }
 
     // ================= SINGLE PRODUCT =================
-    const { name, description, price, categoryName, subCategory, quantity } =
+    const { name, description, price, basePrice,categoryName, subCategory, quantity } =
       req.body;
 
     if (!name || !categoryName) {
@@ -73,6 +74,7 @@ export const createOrUploadProducts = async (req, res) => {
     const product = await Product.create({
       name: name.trim(),
       description: description || "",
+      basePrice: basePrice || "",
       price: price !== undefined ? Number(price) : 0,
       quantity: quantity !== undefined ? Number(quantity) : 0,
       image: result.secure_url,
@@ -118,7 +120,7 @@ export const getProductById = async (req, res) => {
 // ------------------- UPDATE -------------------
 export const updateProduct = async (req, res) => {
   try {
-    const { name, description, price, categoryName, subCategory, quantity } =
+    const { name, description, price,basePrice, categoryName, subCategory, quantity } =
       req.body;
 
     const product = await Product.findById(req.params.id);
@@ -132,6 +134,7 @@ export const updateProduct = async (req, res) => {
     }
 
     if (name !== undefined) product.name = name.trim();
+    if (basePrice !== undefined) product.basePrice = basePrice;
     if (description !== undefined) product.description = description;
     if (price !== undefined) product.price = Number(price);
     if (quantity !== undefined) product.quantity = Number(quantity);
