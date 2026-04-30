@@ -16,7 +16,7 @@ const app = express();
 
 app.use(cors({
   // origin: '*', // frontend URL
-  origin: ['https://ecommece-meh-frontend.vercel.app', 'http://localhost:3000'],
+  origin: 'https://ecommece-meh-frontend.vercel.app',
   credentials: true,
 }));
 app.use((req, res, next) => {
