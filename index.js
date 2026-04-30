@@ -15,7 +15,8 @@ connectDB()
 const app = express();
 
 app.use(cors({
-  origin: '*', // frontend URL
+  // origin: '*', // frontend URL
+  origin: ['https://ecommece-meh-frontend.vercel.app', 'http://localhost:3000'],
   credentials: true,
 }));
 app.use((req, res, next) => {
