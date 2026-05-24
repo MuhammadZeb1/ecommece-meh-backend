@@ -2,11 +2,23 @@ import csv from "csv-parser";
 import XLSX from "xlsx";
 import streamifier from "streamifier";
 import cloudinary from "../config/cloudinary.js";
+import path from "path";
+import pdfParse from "pdf-parse";
+import { createWorker } from 'tesseract.js';
+
+const getTesseractConfig = () => {
+  const basePath = process.cwd();
+  return {
+    workerPath: path.join(basePath, 'node_modules', 'tesseract.js', 'dist', 'worker.min.js'),
+    corePath: path.join(basePath, 'node_modules', 'tesseract.js-core', 'tesseract-core.wasm.js'),
+    langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+  };
+};
 
 // 1. Upload image buffer to Cloudinary
-export const uploadToCloudinary = (buffer, folder = "products") => {
+export const uploadToCloudinary = (buffer, folder = "products", resourceType = "auto") => {
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream({ folder }, (err, result) => {
+    const stream = cloudinary.uploader.upload_stream({ folder, resource_type: resourceType }, (err, result) => {
       if (result) resolve(result);
       else reject(err);
     });
@@ -39,6 +51,52 @@ export const parseCSV = (buffer) => {
       .on("end", () => resolve(results))
       .on("error", (err) => reject(err));
   });
+};
+
+export const extractTextFromPdfBuffer = async (buffer) => {
+  try {
+    const data = await pdfParse(buffer);
+    return data?.text?.trim() || '';
+  } catch (error) {
+    console.error('PDF text extraction failed:', error);
+    return '';
+  }
+};
+
+export const extractTextFromImageBuffer = async (buffer) => {
+  const config = getTesseractConfig();
+  const worker = createWorker({
+    ...config,
+    logger: (message) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[TESSERACT]', message);
+      }
+    },
+  });
+
+  try {
+    await worker.load();
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    const { data } = await worker.recognize(buffer);
+    return data?.text?.trim() || '';
+  } catch (error) {
+    console.error('Tesseract OCR failed:', error);
+    return '';
+  } finally {
+    try {
+      await worker.terminate();
+    } catch (terminateError) {
+      console.warn('Unable to terminate Tesseract worker:', terminateError?.message || terminateError);
+    }
+  }
+};
+
+export const extractTextFromBuffer = async (buffer, mimeType) => {
+  if (mimeType === 'application/pdf') {
+    return extractTextFromPdfBuffer(buffer);
+  }
+  return extractTextFromImageBuffer(buffer);
 };
 
 // 3. Robust Excel Parser

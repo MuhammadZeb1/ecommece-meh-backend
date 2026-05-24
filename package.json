@@ -31,7 +31,10 @@
     "mongoose": "^9.0.1",
     "multer": "^2.0.2",
     "streamifier": "^0.1.1",
-    "xlsx": "^0.18.5"
+    "tesseract.js": "^2.1.5",
+    "xlsx": "^0.18.5",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.13.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

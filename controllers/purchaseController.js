@@ -5,15 +5,14 @@ import Product from "../models/Product.js";
 // =================== Analytics & Reporting ===================
 
 /**
- * Generates Daily, Weekly, and Monthly reports
- * and identifies best-selling products by sorting them.
+ * Generates Pharmacy Reports and Best Sellers
+ * Pulls basePrice from Product model via populate for profit math
  */
 export const getAdminAnalytics = async (req, res) => {
   try {
     const { period } = req.query; // 'daily', 'weekly', 'monthly'
     let startDate = new Date(0);
 
-    // 1. Determine the Start Date for the filter
     if (period === "daily") {
       startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
@@ -24,8 +23,8 @@ export const getAdminAnalytics = async (req, res) => {
       startDate = new Date();
       startDate.setMonth(startDate.getMonth() - 1);
     }
-    // If period is "all", startDate remains new Date(0)
 
+    // Populate "product" to access basePrice and image for reporting
     const purchases = await AdminPurchase.find({
       purchasedAt: { $gte: startDate },
     }).populate("product");
@@ -34,21 +33,23 @@ export const getAdminAnalytics = async (req, res) => {
     let totalProfit = 0;
     let productSalesMap = {}; 
 
-    // 3. Process data in a single loop
     purchases.forEach((item) => {
       const salePrice = item.price || 0;
       const quantity = item.quantity || 0;
-      const basePrice = item.product?.basePrice || 0;
-      const costPrice = basePrice * quantity;
+      
+      // Convert basePrice (String in model) to Number for math
+      const basePrice = Number(item.product?.basePrice) || 0;
+      const totalCost = basePrice * quantity;
 
       totalSales += salePrice;
-      totalProfit += (salePrice - costPrice);
+      totalProfit += (salePrice - totalCost);
 
       const productId = item.product?._id?.toString() || "unknown";
       
       if (!productSalesMap[productId]) {
         productSalesMap[productId] = { 
           name: item.product?.name || "Deleted Product", 
+          genericName: item.product?.genericName || "N/A",
           image: item.product?.image || "", 
           unitsSold: 0, 
           revenue: 0 
@@ -58,7 +59,6 @@ export const getAdminAnalytics = async (req, res) => {
       productSalesMap[productId].revenue += salePrice;
     });
 
-    // 4. Sort products by unitsSold (Highest to Lowest)
     const sortedProducts = Object.values(productSalesMap).sort(
       (a, b) => b.unitsSold - a.unitsSold
     );
@@ -76,122 +76,129 @@ export const getAdminAnalytics = async (req, res) => {
     res.status(500).json({ message: "Analytics Error", error: err.message });
   }
 };
-// Create a purchase (Customer buys a product)
+
+// =================== Purchase Operations ===================
+
+/**
+ * Process purchase and decrement inventory
+ */
 export const createPurchase = async (req, res) => {
   try {
     const { items } = req.body; 
-    console.log("items",items)
     const userId = req.user._id;
 
-    const adminPurchases = [];
-    const customerPurchases = [];
+    const processedItems = [];
 
-    for (let i = 0; i < items.length; i++) {
-      const { productId, quantity } = items[i];
+    for (const item of items) {
+      const { productId, quantity } = item;
 
       const product = await Product.findById(productId);
-      if (!product) return res.status(404).json({ message: "Product not found" });
-      if (quantity > product.quantity)
-        return res.status(400).json({ message: `Quantity exceeds stock for ${product.name}` });
+      if (!product) continue; // Skip if product doesn't exist
 
-      // AdminPurchase
-      const adminPurchase = new AdminPurchase({
+      if (quantity > product.quantity) {
+        return res.status(400).json({ 
+          message: `Stock low for ${product.name}. Available: ${product.quantity}` 
+        });
+      }
+
+      const finalPrice = product.price * quantity;
+
+      // Create Admin record for bookkeeping
+      const adminPurchase = await AdminPurchase.create({
         product: product._id,
         customer: userId,
         quantity,
-        price: product.price * quantity,
+        price: finalPrice,
       });
-      await adminPurchase.save();
-      adminPurchases.push(adminPurchase);
-
-      // CustomerPurchase
-      const customerPurchase = new CustomerPurchase({
+console.log("User creating purchase:", req.user?._id);
+      // Create Customer record for their dashboard
+      const customerPurchase = await CustomerPurchase.create({
         product: product._id,
+        customer: userId, // Ensure this field exists in CustomerPurchaseSchema
         quantity,
-        price: product.price * quantity,
+        price: finalPrice,
       });
-      await customerPurchase.save();
-      customerPurchases.push(customerPurchase);
 
-      // Reduce product stock
+      // Update Inventory
       product.quantity -= quantity;
       await product.save();
+
+      processedItems.push({ adminPurchase, customerPurchase });
     }
 
-    res.status(201).json({ message: "Purchase successful", adminPurchases, customerPurchases });
+    res.status(201).json({ 
+      message: "Order placed successfully", 
+      count: processedItems.length 
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Purchase failed", error: err.message });
   }
 };
 
+// =================== Retrieval Operations ===================
 
-// Get all purchases for Admin
 export const getAllAdminPurchases = async (req, res) => {
   try {
     const purchases = await AdminPurchase.find()
-      .populate({
-        path: "product",
-        select: "name price image"
-      })
-      .populate({
-        path: "customer",
-        select: "name email"
-      });
+      .populate("product", "name genericName price image batchNumber expiryDate")
+      .populate("customer", "name email")
+      .sort("-purchasedAt");
 
     res.json(purchases);
   } catch (err) {
-    console.error("Admin purchases error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
-// Get all purchases for Customer
 export const getCustomerPurchases = async (req, res) => {
   try {
-    const purchases = await CustomerPurchase.find({ })
-      .populate({
-        path: "product",
-        select: "name price image"
-      })
+    // CRITICAL: Filter by the logged-in user's ID
+    const purchases = await CustomerPurchase.find({ customer: req.user._id })
+      .populate("product", "name genericName price image dosageForm strength expiryDate")
+      .sort("-purchasedAt");
+      
     res.json(purchases);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Delete purchase by Admin (also delete from customer)
+// =================== Deletion Operations ===================
+
 export const deletePurchaseByAdmin = async (req, res) => {
   try {
     const { purchaseId } = req.params;
 
     const adminPurchase = await AdminPurchase.findById(purchaseId);
-    if (!adminPurchase) return res.status(404).json({ message: "Purchase not found" });
+    if (!adminPurchase) return res.status(404).json({ message: "Record not found" });
 
-    // Delete from AdminPurchase
+    // Remove from both logs
     await AdminPurchase.findByIdAndDelete(purchaseId);
+    await CustomerPurchase.findOneAndDelete({ 
+      product: adminPurchase.product, 
+      customer: adminPurchase.customer 
+    });
 
-    // Delete corresponding CustomerPurchase
-    await CustomerPurchase.findOneAndDelete({ product: adminPurchase.product });
-
-    res.json({ message: "Purchase deleted by admin" });
+    res.json({ message: "Purchase history cleared by admin" });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Delete purchase by Customer (does NOT affect Admin)
 export const deletePurchaseByCustomer = async (req, res) => {
   try {
     const { purchaseId } = req.params;
 
-    const purchase = await CustomerPurchase.findById(purchaseId);
-    if (!purchase) return res.status(404).json({ message: "Purchase not found" });
+    // Verify user owns this record before deleting
+    const purchase = await CustomerPurchase.findOne({ 
+      _id: purchaseId, 
+      customer: req.user._id 
+    });
+
+    if (!purchase) return res.status(404).json({ message: "Record not found" });
 
     await CustomerPurchase.findByIdAndDelete(purchaseId);
-
-    res.json({ message: "Purchase deleted by customer" });
+    res.json({ message: "Removed from your history" });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }

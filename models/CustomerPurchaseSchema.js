@@ -7,6 +7,12 @@ const customerPurchaseSchema = new mongoose.Schema({
     ref: "Product",
     required: true,
   },
+  // ADD THIS FIELD:
+  customer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User", // Assuming your user model is named "User"
+    required: true,
+  },
   quantity: { type: Number, default: 1 },
   price: { type: Number, required: true },
   purchasedAt: { type: Date, default: Date.now },
