@@ -1,5 +1,3 @@
-// controllers/productController.js
-
 import Product from "../models/product.js";
 import { parseCSV, parseExcel, uploadToCloudinary } from "../utils/fileHelpers.js";
 
@@ -7,15 +5,10 @@ import { parseCSV, parseExcel, uploadToCloudinary } from "../utils/fileHelpers.j
 export const createOrUploadProducts = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        message: "File or image is required",
-      });
+      return res.status(400).json({ message: "File or image is required" });
     }
 
-    const fileType = req.file.originalname
-      .split(".")
-      .pop()
-      .toLowerCase();
+    const fileType = req.file.originalname.split(".").pop().toLowerCase();
 
     // ================= BULK UPLOAD =================
     if (["csv", "xlsx", "xls"].includes(fileType)) {
@@ -37,69 +30,31 @@ export const createOrUploadProducts = async (req, res) => {
         .filter((p) => p.name)
         .map((p) => ({
           name: p.name.trim(),
-
-          genericName: p.genericName
-            ? p.genericName.trim()
-            : p.name.trim(),
-
+          genericName: p.genericName ? p.genericName.trim() : p.name.trim(),
           description: p.description || "",
-
-          basePrice: p.basePrice
-            ? String(p.basePrice)
-            : "",
-
-          price:
-            p.price !== undefined
-              ? Number(p.price)
-              : 0,
-
-          quantity:
-            p.quantity !== undefined
-              ? Number(p.quantity)
-              : 0,
-
-          image:
-            p.image ||
-            "https://via.placeholder.com/150",
-
-          dosageForm:
-            p.dosageForm || "Tablet",
-
-          strength:
-            p.strength || "N/A",
-
-          // ✅ SKU ADDED
+          basePrice: p.basePrice ? String(p.basePrice) : "",
+          price: p.price !== undefined ? Number(p.price) : 0,
+          quantity: p.quantity !== undefined ? Number(p.quantity) : 0,
+          image: p.image || "https://via.placeholder.com/150",
+          dosageForm: p.dosageForm || "Tablet",
+          strength: p.strength || "N/A",
           sku: p.sku ? p.sku.trim() : undefined,
-
-          requiresPrescription:
-            String(p.requiresPrescription)
-              .toLowerCase() === "true",
-
+          requiresPrescription: String(p.requiresPrescription).toLowerCase() === "true",
           expiryDate: p.expiryDate
             ? new Date(p.expiryDate)
-            : new Date(
-                Date.now() + 31536000000
-              ),
+            : new Date(Date.now() + 31536000000),
 
           category: {
-            name:
-              p.categoryName ||
-              "Uncategorized",
-
-            subCategory:
-              p.subCategory || "",
+            name: p.categoryName || "Uncategorized",
+            subCategory: p.subCategory || "",
           },
         }));
 
-      const createdProducts =
-        await Product.insertMany(formattedData);
+      const createdProducts = await Product.insertMany(formattedData);
 
       return res.status(201).json({
-        message:
-          "Bulk medicines uploaded successfully",
-
+        message: "Bulk medicines uploaded successfully",
         count: createdProducts.length,
-
         createdProducts,
       });
     }
@@ -118,95 +73,50 @@ export const createOrUploadProducts = async (req, res) => {
       strength,
       requiresPrescription,
       expiryDate,
-      sku, // ✅ ADDED
+      sku,
     } = req.body;
 
-    if (
-      !name ||
-      !categoryName ||
-      !genericName
-    ) {
+    if (!name || !categoryName || !genericName) {
       return res.status(400).json({
-        message:
-          "Brand Name, Generic Name, and Category are required",
+        message: "Brand Name, Generic Name, and Category are required",
       });
     }
 
-    const result = await uploadToCloudinary(
-      req.file.buffer
-    );
+    const result = await uploadToCloudinary(req.file.buffer);
 
     const product = await Product.create({
       name: name.trim(),
-
-      genericName:
-        genericName.trim(),
-
-      description:
-        description || "",
-
-      basePrice:
-        basePrice || "",
-
-      price:
-        Number(price) || 0,
-
-      quantity:
-        Number(quantity) || 0,
-
-      image:
-        result.secure_url,
-
-      dosageForm:
-        dosageForm || "Tablet",
-
-      strength:
-        strength || "",
-
-      // ✅ SKU SAVED
-      sku: sku
-        ? sku.trim()
-        : undefined,
-
+      genericName: genericName.trim(),
+      description: description || "",
+      basePrice: basePrice || "",
+      price: Number(price) || 0,
+      quantity: Number(quantity) || 0,
+      image: result.secure_url,
+      dosageForm: dosageForm || "Tablet",
+      strength: strength || "",
+      sku: sku ? sku.trim() : undefined,
       requiresPrescription:
-        requiresPrescription === "true" ||
-        requiresPrescription === true,
-
-      expiryDate:
-        expiryDate
-          ? new Date(expiryDate)
-          : undefined,
-
+        requiresPrescription === "true" || requiresPrescription === true,
+      expiryDate: expiryDate ? new Date(expiryDate) : undefined,
       category: {
         name: categoryName,
-
-        subCategory:
-          subCategory || "",
+        subCategory: subCategory || "",
       },
     });
 
     res.status(201).json({
-      message:
-        "Medicine created successfully",
-
+      message: "Medicine created successfully",
       product,
     });
   } catch (err) {
-    console.error(
-      "Create Controller Error:",
-      err
-    );
-
-    res.status(500).json({
-      message: err.message,
-    });
+    console.error("Create Controller Error:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
 // ------------------- READ ALL -------------------
 export const getAllProducts = async (req, res) => {
   try {
-    // We sort by expiryDate so admin can see what is expiring soonest
     const products = await Product.find().sort({ expiryDate: 1 });
     res.status(200).json(products);
   } catch (err) {
@@ -230,21 +140,21 @@ export const getProductById = async (req, res) => {
 // ------------------- UPDATE -------------------
 export const updateProduct = async (req, res) => {
   try {
-   const {
-  name,
-  genericName,
-  description,
-  price,
-  basePrice,
-  categoryName,
-  subCategory,
-  quantity,
-  dosageForm,
-  strength,
-  requiresPrescription,
-  expiryDate,
-  sku
-} = req.body;
+    const {
+      name,
+      genericName,
+      description,
+      price,
+      basePrice,
+      categoryName,
+      subCategory,
+      quantity,
+      dosageForm,
+      strength,
+      requiresPrescription,
+      expiryDate,
+      sku,
+    } = req.body;
 
     const product = await Product.findById(req.params.id);
     if (!product)
@@ -255,26 +165,28 @@ export const updateProduct = async (req, res) => {
       product.image = result.secure_url;
     }
 
-    // Update basic fields
     if (name !== undefined) product.name = name.trim();
     if (genericName !== undefined) product.genericName = genericName.trim();
     if (basePrice !== undefined) product.basePrice = basePrice;
     if (description !== undefined) product.description = description;
     if (price !== undefined) product.price = Number(price);
     if (quantity !== undefined) product.quantity = Number(quantity);
-    if (sku !== undefined) product.sku = sku.trim(); // ADDED SKU UPDATE LOGIC
-    
-    // Update medical fields
+    if (sku !== undefined) product.sku = sku.trim();
+
     if (dosageForm !== undefined) product.dosageForm = dosageForm;
     if (strength !== undefined) product.strength = strength;
-    if (requiresPrescription !== undefined) {
-        product.requiresPrescription = requiresPrescription === 'true' || requiresPrescription === true;
-    }
-    if (expiryDate !== undefined) product.expiryDate = new Date(expiryDate);
 
-    // Update category
+    if (requiresPrescription !== undefined) {
+      product.requiresPrescription =
+        requiresPrescription === "true" || requiresPrescription === true;
+    }
+
+    if (expiryDate !== undefined)
+      product.expiryDate = new Date(expiryDate);
+
     if (categoryName !== undefined) product.category.name = categoryName;
-    if (subCategory !== undefined) product.category.subCategory = subCategory;
+    if (subCategory !== undefined)
+      product.category.subCategory = subCategory;
 
     await product.save();
 
@@ -288,7 +200,7 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-
+// ------------------- EXPIRY ALERTS -------------------
 export const getExpiryAlerts = async (req, res) => {
   try {
     const days = Number(req.query.days) || 7;
@@ -316,7 +228,10 @@ export const getExpiryAlerts = async (req, res) => {
       thresholdDays: days,
     });
   } catch (err) {
-    res.status(500).json({ message: 'Expiry alert lookup failed', error: err.message });
+    res.status(500).json({
+      message: "Expiry alert lookup failed",
+      error: err.message,
+    });
   }
 };
 
@@ -327,7 +242,9 @@ export const deleteProduct = async (req, res) => {
     if (!product)
       return res.status(404).json({ message: "Medicine not found" });
 
-    res.status(200).json({ message: "Medicine deleted successfully" });
+    res.status(200).json({
+      message: "Medicine deleted successfully",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

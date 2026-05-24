@@ -33,7 +33,11 @@ const productSchema = new mongoose.Schema({
     
     // Inventory & Safety
     quantity: { type: Number, required: true },
+<<<<<<< HEAD
     sku: { type: String, }, // Stock Keeping Unit
+=======
+    sku: { type: String, unique: true }, // Stock Keeping Unit
+>>>>>>> 11b00b4 (for deployment)
     batchNumber: { type: String },
     expiryDate: { type: Date, required: true },
     
